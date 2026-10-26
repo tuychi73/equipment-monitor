@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uskunalar monitoringi</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --text:#1d2330; --muted:#6b7280; --line:#e5e7eb;
+          --ok:#15803d; --ok-bg:#dcfce7; --warn:#b45309; --warn-bg:#fef3c7; --down:#b91c1c; --down-bg:#fee2e2; --unk:#6b7280; --unk-bg:#f3f4f6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1218; --card:#171b23; --text:#e5e7eb; --muted:#9ca3af; --line:#2a303b;
+            --ok:#4ade80; --ok-bg:#12301e; --warn:#fbbf24; --warn-bg:#3a2c0b; --down:#f87171; --down-bg:#3b1414; --unk:#9ca3af; --unk-bg:#22272f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:20px 24px 8px; display:flex; flex-wrap:wrap; gap:16px; align-items:baseline; justify-content:space-between; }
+  h1 { margin:0; font-size:22px; }
+  .summary { display:flex; gap:10px; flex-wrap:wrap; }
+  .pill { padding:4px 12px; border-radius:999px; font-weight:600; font-size:14px; }
+  main { padding:8px 24px 32px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-left:6px solid var(--unk); border-radius:10px; padding:14px 16px; }
+  .card.OK { border-left-color:var(--ok); } .card.WARN { border-left-color:var(--warn); } .card.DOWN { border-left-color:var(--down); }
+  .name { font-weight:700; font-size:15px; }
+  .meta { color:var(--muted); font-size:12.5px; margin-top:2px; }
+  .row { display:flex; justify-content:space-between; margin-top:10px; font-size:13px; }
+  .badge { font-size:12px; font-weight:700; padding:2px 8px; border-radius:6px; white-space:nowrap; align-self:flex-start; margin-left:8px; }
+  .OK .badge, .pill.OK { color:var(--ok); background:var(--ok-bg); }
+  .WARN .badge, .pill.WARN { color:var(--warn); background:var(--warn-bg); }
+  .DOWN .badge, .pill.DOWN { color:var(--down); background:var(--down-bg); }
+  .UNKNOWN .badge { color:var(--unk); background:var(--unk-bg); }
+  .detail { margin-top:8px; font-size:12.5px; color:var(--muted); min-height:1.2em; overflow-wrap:anywhere; }
+  h2 { font-size:17px; margin:28px 0 10px; }
+  .tablewrap { overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:10px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; min-width:640px; }
+  th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; }
+  .muted { color:var(--muted); font-size:13px; }
+  @media (max-width: 600px) { header, main { padding-left:16px; padding-right:16px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Uskunalar monitoringi</h1>
+  <div class="summary" id="summary"></div>
+</header>
+<main>
+  <div class="grid" id="grid"></div>
+  <h2>Nosozliklar jurnali <span class="muted" id="mttr"></span></h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>#</th><th>Qurilma</th><th>Turi</th><th>Boshlandi</th><th>Tugadi</th><th>Davomiyligi</th><th>Sabab</th></tr></thead>
+      <tbody id="incidents"></tbody>
+    </table>
+  </div>
+  <p class="muted" id="updated"></p>
+</main>
+<script>
+const LABEL = { OK: "ISHLAYAPTI", WARN: "OGOHLANTIRISH", DOWN: "ISHLAMAYAPTI", UNKNOWN: "NOMA'LUM" };
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const fmt = iso => iso ? new Date(iso).toLocaleString() : "—";
+
+async function refresh() {
+  try {
+    const [s, inc] = await Promise.all([fetch("/api/status").then(r => r.json()), fetch("/api/incidents").then(r => r.json())]);
+    const counts = { OK: 0, WARN: 0, DOWN: 0 };
+    const grid = document.getElementById("grid"); grid.replaceChildren();
+    for (const d of s.devices) {
+      if (counts[d.status] != null) counts[d.status]++;
+      const c = el("div", "card " + d.status);
+      const top = el("div", "row"); top.style.marginTop = "0";
+      top.append(el("span", "name", d.name), el("span", "badge", LABEL[d.status] || d.status));
+      c.append(top, el("div", "meta", `${d.location} · ${d.type} · ${d.check}`));
+      const r1 = el("div", "row");
+      r1.append(el("span", null, "Javob vaqti: " + (d.latency_ms != null ? d.latency_ms + " ms" : "—")),
+                el("span", null, "24 soat: " + (d.uptime_24h != null ? d.uptime_24h + "%" : "—")));
+      c.append(r1, el("div", "detail", d.detail || ""));
+      grid.append(c);
+    }
+    const sum = document.getElementById("summary"); sum.replaceChildren();
+    for (const k of ["OK", "WARN", "DOWN"]) sum.append(el("span", "pill " + k, `${LABEL[k]}: ${counts[k]}`));
+    document.getElementById("mttr").textContent = s.mttr_minutes != null ? `· o'rtacha tiklash vaqti (MTTR): ${s.mttr_minutes} daq.` : "";
+
+    const tb = document.getElementById("incidents"); tb.replaceChildren();
+    for (const i of inc) {
+      const tr = el("tr");
+      [i.id, i.device_name, i.kind, fmt(i.opened_at), i.closed_at ? fmt(i.closed_at) : "davom etmoqda",
+       i.minutes + " daq.", i.detail || ""].forEach(v => tr.append(el("td", null, String(v))));
+      tb.append(tr);
+    }
+    if (!inc.length) { const tr = el("tr"); const td = el("td", "muted", "Hozircha nosozlik qayd etilmagan"); td.colSpan = 7; tr.append(td); tb.append(tr); }
+    document.getElementById("updated").textContent = "Yangilandi: " + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById("updated").textContent = "Server bilan aloqa yo'q: " + e;
+  }
+}
+refresh(); setInterval(refresh, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+# Kuzatiladigan uskunalar ro'yxati.
+# Demo uchun barcha manzillar simulyatorga (python -m simulator) qaratilgan.
+# Real ob'ektda: host/url o'rniga qurilmalarning lokal tarmoqdagi IP manzillari yoziladi.
+# Telegram: TELEGRAM_BOT_TOKEN va TELEGRAM_CHAT_ID muhit o'zgaruvchilari (faylga yozilmaydi!).
+
+[settings]
+interval = 10          # soniya
+fail_threshold = 2     # ketma-ket 2 ta xato -> DOWN
+db_path = "data/monitor.db"
+
+# ---------- Robo-gidlar ----------
+[[device]]
+id = "robot-1"
+name = "Robo-gid #1"
+type = "robot"
+location = "1-qavat, bosh zal"
+check = "http"
+url = "http://127.0.0.1:9100/robot/1/health"
+min = { battery = 20 }
+expect = { lidar = ["ok"] }
+
+[[device]]
+id = "robot-2"
+name = "Robo-gid #2"
+type = "robot"
+location = "2-qavat, ekspozitsiya"
+check = "http"
+url = "http://127.0.0.1:9100/robot/2/health"
+min = { battery = 20 }
+expect = { lidar = ["ok"] }
+
+# ---------- 3D printer ----------
+[[device]]
+id = "printer-1"
+name = "3D printer (laboratoriya)"
+type = "printer3d"
+location = "Media laboratoriya"
+check = "http"
+url = "http://127.0.0.1:9100/printer/1/status"
+max = { hotend_temp = 260 }
+expect = { state = ["Operational", "Printing"] }
+
+# ---------- Multimedia ----------
+[[device]]
+id = "kiosk-1"
+name = "AI-personaj ekrani"
+type = "kiosk"
+location = "Qabulxona"
+check = "http"
+url = "http://127.0.0.1:9100/kiosk/1/health"
+max = { cpu_temp = 80 }
+
+[[device]]
+id = "projector-1"
+name = "Proyektor (konferens-zal)"
+type = "projector"
+location = "Konferens-zal"
+check = "tcp"
+host = "127.0.0.1"
+port = 14352          # PJLink standart porti 4352
+
+[[device]]
+id = "projector-2"
+name = "Proyektor (kinozal)"
+type = "projector"
+location = "Kinozal"
+check = "tcp"
+host = "127.0.0.1"
+port = 14353          # simulyatorda ataylab yopiq: DOWN holatini ko'rsatish uchun
+timeout = 1.0
+
+# ---------- Kompyuterlar va tarmoq ----------
+[[device]]
+id = "pc-info-desk"
+name = "Ma'lumot stoli kompyuteri"
+type = "pc"
+location = "Qabulxona"
+check = "ping"
+host = "127.0.0.1"
